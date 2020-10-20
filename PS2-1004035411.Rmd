@@ -1,0 +1,173 @@
+---
+title: "Regression Analysis of 2017 Canadian General Social Survey Data"
+author: "Amber Kao"
+date: "2020/10/19"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Regression Analysis of 2017 Canadian General Social Survey Data
+
+# Amber Kao
+# 2020/10/19
+
+## Abstract
+
+The Canadian General Social Survey (GSS) is a census conducted every year with a different topic. The GSS data in 2017 contains many interesting variables for analysis. A logistic regression model is constructed to investigate the relationship between age, personal income, level of education, feelings towards life and the presence or absence of religious affiliation of respondents. All of the variables presented a significant correlation with religious affiliation, and the age distribution is presented as an example as well. Further analysis can be conducted on the other predictor variables to further investigate the relationships between them.
+
+``` {r, echo = FALSE, message = FALSE, warning = FALSE, results = FALSE}
+setwd(dir = "C:/Users/amber/Desktop/Academic/4thYear/STA304/R/")
+library(tidyverse)
+library(survey)
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(broom)
+
+mydata <- read.csv(file = "gss.csv")
+```
+
+## Introduction
+
+It is important for a government to understand its people in order to adjust or form new policies that most benefit its citizens. Every year, the General Social Survey (GSS) is conducted through telephone interviews to survey several aspects of Canadians' lives. In 2017, the survey topic was "Family", which included questions about Canadian lives and their family members such as birthplace, language spoken, marital status, and many more. Surveyed individuals were at least 15 years of age, chosen through sampling, and interviewed over telephone. We conduct regression analysis to investigate whether there is a relationship between four variables--age, personal income, level of education, feelings towards life--and whether an individual has a religious affiliation. Through this analysis, we can better understand whether certain types of people or people in certain stages of life are more likely to have a religious affiliation. 
+
+## Data
+
+The 2017 General Social Survey (GSS) data was chosen for this analysis because it is the most recently published cycle of the GSS, and it contains a multitude of interesting variables to analyze regarding Canadian families. Out of a population of approximately 30,633,177 Canadians who were at least 15 years old as of July 1st 2017, 20,602 individuals were sampled. The frame population is all people at least 15 years old who could be contacted by telephone by the government. The GSS data was obtained from the CHASS website and data cleaning was performed with R code written by Rohan Alexander and Sam Caetano. There are 81 variables in this dataset, of which 5 were selected for regression analysis.
+
+Age is a numerical variable that records the age of each respondent. Personal income is a categorical variable that records the range of income that the respondent makes, and is separated into 6 categories. Level of education is a categorical variable that records the highest level of education that an individual has obtained, and has 7 categories. Feelings towards life is a numerical variable that records an individual's general feelings about life, ranging from 0 (very dissatisfied) to 10 (very satisfied). The response variable, religious affiliation, is a binary variable that records whether an individual identifies with a religious affiliation. "Has religious affiliation" was recoded to 1, and "No religious affiliation" was recoded to 0 to aid statistical analysis. The original data contained 441 values that were either "not available" or "don't know", and these observations were removed from analysis.
+
+``` {r, echo = FALSE, message = FALSE, warning = FALSE, results = FALSE}
+data1 <- tibble(age = mydata$age, 
+                income = mydata$income_respondent, 
+                education = mydata$education, 
+                feel = mydata$feelings_life, 
+                religion = mydata$religion_has_affiliation)
+
+doi <- data1 %>% 
+  filter(religion != "Don't know" & religion != "NA") %>% 
+  mutate(
+    religion = case_when(
+      religion == "Has religious affiliation" ~ 1, 
+      religion == "No religious affiliation" ~ 0), 
+    education = case_when(
+      education == "Less than high school diploma or its equivalent" ~ "Less than high school", 
+      education == "Trade certificate or diploma" ~ "Trade certificate", 
+      education == "High school diploma or a high school equivalency certificate" ~ "High school", 
+      education == "College, CEGEP or other non-university certificate or di..." ~ "College or non-uni", 
+      education == "University certificate or diploma below the bachelor's level" ~ "University below bachelor's", 
+      education == "Bachelor's degree (e.g. B.A., B.Sc., LL.B.)" ~ "Bachelor's degree", 
+      education == "University certificate, diploma or degree above the bach..." ~ "University above bachelor's"), 
+    income = case_when(
+      income == "Less than $25,000" ~ "$0 to $25,000", 
+      income == "$25,000 to $49,999" ~ "$25,000 to $49,999", 
+      income == "$50,000 to $74,999" ~ "$50,000 to $74,999", 
+      income == "$75,000 to $99,999" ~ "$75,000 to $99,999", 
+      income == "$100,000 to $ 124,999" ~ "$100,000 to $124,999", 
+      income == "$125,000 and more" ~ "$125,000+")
+  )
+
+n = length(doi$religion)
+N = 30633177
+
+fpc.srs <- rep(N, n)
+
+study.design <- svydesign(id = ~1, data = doi, fpc = fpc.srs)
+
+model <- svyglm(religion ~ age + income + education + feel, study.design, family = "binomial")
+
+summary(model)
+```
+
+## Model
+
+A logistic regression model was constructed to analyze the correlation between age, personal income, level of education, and feelings towards life with the presence or absence of a religious affiliation. A logistic regression model was chosen because the response variable is binary, while the predictor variables are either quantitative or categorical. There were no higher order or interaction variables added as predictor variables. 
+
+The population size, N, was estimated from the total Canadian population as of July 1st 2017 minus the population aged 0-14 years old (also as of July 1st 2017), since this study surveyed individuals of at least 15 years old. Finite population correction was performed when constructing the model since the total population, while very large, is not infinite. The sampling survey design was corrected for as well. 
+
+## Results
+
+Figure 1: Descriptive statistics of variables used in the model
+``` {r, echo = FALSE, message = FALSE, warning = FALSE}
+kable(tidy(model))
+```
+
+As seen in Figure 1, each predictor variable had at least one category that was significant in terms of having a relationship with the response variable. Categories with significant p-values (< 0.05) include: age, income between \$100,000 and \$124,999, income between \$75,000 and \$99,999, college or non-university degree, less than high school education, trade certificate or degree, and feelings towards life. The income and education variables were categorical variables, therefore each category was compared to the reference category in terms of significance. The reference categories were income between \$0 and \$24,999 and Bachelor's degree for income and education, respectively. The standard error values were mostly very low. The regression coefficient estimates were mostly small numbers between -1 and 1, which indicates that for the variables with a significant correlation with religious affiliation, there is small effect of the variable on religious affiliation.
+
+Figure 2: Number of individuals with vs. without religious affiliation
+``` {r, echo = FALSE, message = FALSE, warning = FALSE, results = FALSE}
+doi %>% 
+  group_by(religion) %>% 
+  summarize(n = n())
+```
+
+religion | n
+------------- | -------------
+0 | 4006
+1 | 16155
+
+As seen in Figure 2, 16155 of the respondents had a religious affiliation, while 4006 of the respondents did not have a religious affiliation. There are around 4 times more respondents with a religious affiliation than those without; in other words, around 19.87% of respondents reported no religious affiliation. 
+
+Figure 3: Histogram of the age distribution of individuals with a religious affiliation
+``` {r, echo = FALSE, message = FALSE, warning = FALSE}
+# Separate data into people with religious affiliation and people with no religious affiliation
+yes <- doi %>% 
+  filter(religion == 1)
+
+yes %>% 
+  ggplot(aes(age)) + 
+  geom_histogram()
+```
+
+As seen in Figure 3, the age distribution of people with religious affiliation is approximately bimodal, with a very high peak at age 80. The high peak at age 80 is due to respondents older than 80 years old simply being recorded as 80 years old, so we do not know the true age distribution of respondents over 80 years old. The two peaks are at around 40 and 60 years of age, with the higher peak at 60 years of age.
+
+Figure 4: Histogram of the age distribution of individuals with no religious affiliation
+``` {r, echo = FALSE, message = FALSE, warning = FALSE}
+no <- doi %>% 
+  filter(religion == 0)
+
+no %>% 
+  ggplot(aes(age)) + 
+  geom_histogram()
+```
+
+As seen in Figure 4, the age distribution of respondents without religious affiliation is approximately right-skewed, with the major peak at around 30 years of age. There is a smaller peak at around 60 years of age as well.
+
+## Discussion
+
+For the categorical variables, income and education, not all of the categories presented a significant correlation with religious affiliation. This indicates that income and education do correlate with religious affiliation, but the relationship may not be linear and other variables could affect some of the categories. It is also interesting that while the relationship is significant, the effect of the variables on religious affiliation is small. This is reasonable, since religious affiliation can be caused by many different aspects in life. This opens a new direction for future analysis, either with this data set or with other types of census data. The difference in the age distribution of respondents with and without religious affiliation is quite interesting, and indicates that while individuals without religious affiliation are the minority, a majority of these individuals are young.
+
+# Weaknesses
+
+There were both advantages and disadvantages of the study method. Individuals were chosen through sampling in order to appropriately represent the Canadian population, but participants could choose to withdraw from the study or withold information during the interview. Witheld information was recorded as NA, which resulted in the loss of some data during analysis. Another weakness is that respondents over 80 years old were all recorded as 80 years old, which results in inaccurate representation of the distribution of sampled individuals who were over 80 years old. 
+441 rows (around 2.14% of rows) with "NA" and "don't know" values in the responsible variable were removed to aid statistical analysis of the binary response variable. This decreased the accuracy of the analysis but did not significantly impact the results.
+
+Feelings towards life was recorded on a scale of 0 to 10 with only full numbers recorded, so this variable could be analyzed as either a numerical or categorical variable. A drawback of analyzing feelings towards life as a numerical instead of a categorical variable is that the recorded data already does not fully capture the values between the full numbers, therefore a numerical analysis is more convenient but does not capture the categorical nature of the variable.
+
+# Next Steps
+
+Further analysis can be conducted on the relationship of each predictor variable with the response variable. Additional regression models with higher order or interaction variables can be constructed as well, since some of the predictor variables could be correlated with each other. Other variables in the original GSS dataset could be analyzed as well to further discover the relationships between more aspects of Canadian lives. 
+
+## References
+
+1. Alexander, R. (2020, May 17). Telling Stories With Data. Retrieved October 18, 2020, from https://www.tellingstorieswithdata.com/
+
+2. Computing in the Humanities and Social Sciences. (n.d.). Retrieved October 19, 2020, from http://www.chass.utoronto.ca/
+
+3. Government of Canada, Statistics Canada. (2020, September 29). Population estimates on July 1st, by age and sex. Retrieved October 18, 2020, from https://doi.org/10.25318/1710000501-eng
+
+4. Lumley, T. (2020) "survey: analysis of complex survey samples". R package version 4.0.
+
+5. Robinson, D., Hayes, A., & Couch, S. (2020). broom: Convert Statistical Objects into Tidy Tibbles. R package version 0.7.1. https://CRAN.R-project.org/package=broom
+
+6. Wickham, H., François, R., Henry, L. & Müller, K. (2020). dplyr: A Grammar of Data Manipulation. R package version 1.0.0. https://CRAN.R-project.org/package=dplyr
+
+7. Wickham, H. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
+
+8. Wu, C., & Thompson, M. E. "Basic Concepts in Survey Sampling." Sampling Theory and Practice. Springer, Cham, 2020. 3-15.
+
+9. Xie, Y. (2020). knitr: A General-Purpose Package for Dynamic Report Generation in R. R package version 1.30.
+
